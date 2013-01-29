@@ -73,6 +73,7 @@ var IPython = (function (IPython) {
             indentUnit : 4,
             mode: 'python',
             theme: 'ipython',
+            keyMap: 'vim',
             readOnly: this.read_only,
             extraKeys: {"Tab": "indentMore","Shift-Tab" : "indentLess",'Backspace':"delSpaceToPrevTabStop"},
             onKeyEvent: $.proxy(this.handle_codemirror_keyevent,this),
