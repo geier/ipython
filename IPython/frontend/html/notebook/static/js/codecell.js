@@ -15,6 +15,32 @@
  * @submodule CodeCell
  */
 
+
+/* local util for codemirror */
+var posEq = function(a, b) {return a.line == b.line && a.ch == b.ch;}
+
+/**
+ *
+ * function to delete until previous non blanking space character
+ * or first multiple of 4 tabstop.
+ * @private
+ */
+CodeMirror.commands.delSpaceToPrevTabStop = function(cm){
+    var from = cm.getCursor(true), to = cm.getCursor(false), sel = !posEq(from, to);
+    if (!posEq(from, to)) {cm.replaceRange("", from, to); return}
+    var cur = cm.getCursor(), line = cm.getLine(cur.line);
+    var tabsize = cm.getOption('tabSize');
+    var chToPrevTabStop = cur.ch-(Math.ceil(cur.ch/tabsize)-1)*tabsize;
+    var from = {ch:cur.ch-chToPrevTabStop,line:cur.line}
+    var select = cm.getRange(from,cur)
+    if( select.match(/^\ +$/) != null){
+        cm.replaceRange("",from,cur)
+    } else {
+        cm.deleteH(-1,"char")
+    }
+};
+
+
 var IPython = (function (IPython) {
     "use strict";
 
@@ -32,20 +58,44 @@ var IPython = (function (IPython) {
      *
      * @constructor
      * @param {Object|null} kernel
+     * @param {object|undefined} [options]
+     *      @param [options.cm_config] {object} config to pass to CodeMirror
      */
-    var CodeCell = function (kernel) {
+    var CodeCell = function (kernel, options) {
+        var options = options || {}
         this.kernel = kernel || null;
         this.code_mirror = null;
         this.input_prompt_number = null;
         this.collapsed = false;
         this.default_mode = 'python';
-        IPython.Cell.apply(this, arguments);
+
+
+        var cm_overwrite_options  = {
+            extraKeys: {"Tab": "indentMore","Shift-Tab" : "indentLess",'Backspace':"delSpaceToPrevTabStop"},
+            onKeyEvent: $.proxy(this.handle_codemirror_keyevent,this)
+        };
+
+        var arg_cm_options = options.cm_options || {};
+        var cm_config = $.extend({},CodeCell.cm_default, arg_cm_options, cm_overwrite_options);
+
+        var options = {};
+        options.cm_config = cm_config;
+
+        IPython.Cell.apply(this,[options]);
 
         var that = this;
         this.element.focusout(
             function() { that.auto_highlight(); }
         );
     };
+
+    CodeCell.cm_default = {
+            mode: 'python',
+            theme: 'ipython',
+            matchBrackets: true,
+            keyMap: 'vim'
+    };
+
 
     CodeCell.prototype = new IPython.Cell();
 
@@ -64,22 +114,27 @@ var IPython = (function (IPython) {
         cell.attr('tabindex','2');
 
         this.celltoolbar = new IPython.CellToolbar(this);
-        cell.append(this.celltoolbar.element);
 
         var input = $('<div></div>').addClass('input hbox');
+        var vbox = $('<div/>').addClass('vbox box-flex1')
         input.append($('<div/>').addClass('prompt input_prompt'));
-        var input_area = $('<div/>').addClass('input_area box-flex1');
-        this.code_mirror = CodeMirror(input_area.get(0), {
-            indentUnit : 4,
-            mode: 'python',
-            theme: 'ipython',
-            keyMap: 'vim',
-            readOnly: this.read_only,
-            extraKeys: {"Tab": "indentMore","Shift-Tab" : "indentLess",'Backspace':"delSpaceToPrevTabStop"},
-            onKeyEvent: $.proxy(this.handle_codemirror_keyevent,this),
-            matchBrackets: true
-        });
-        input.append(input_area);
+        //var input_area = $('<div/>').addClass('input_area box-flex1');
+        //this.code_mirror = CodeMirror(input_area.get(0), {
+            //indentUnit : 4,
+            //mode: 'python',
+            //theme: 'ipython',
+            //keyMap: 'vim',
+            //readOnly: this.read_only,
+            //extraKeys: {"Tab": "indentMore","Shift-Tab" : "indentLess",'Backspace':"delSpaceToPrevTabStop"},
+            //onKeyEvent: $.proxy(this.handle_codemirror_keyevent,this),
+            //matchBrackets: true
+        //});
+        //input.append(input_area);
+        vbox.append(this.celltoolbar.element);
+        var input_area = $('<div/>').addClass('input_area');
+        this.code_mirror = CodeMirror(input_area.get(0), this.cm_config);
+        vbox.append(input_area);
+        input.append(vbox);
         var output = $('<div></div>');
         cell.append(input).append(output);
         this.element = cell;

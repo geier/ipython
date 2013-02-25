@@ -34,21 +34,21 @@ import uuid
 from IPython.config.application import boolean_flag
 from IPython.config.configurable import Configurable
 from IPython.core.profiledir import ProfileDir
-from IPython.lib.kernel import tunnel_to_kernel, find_connection_file, swallow_argv
-from IPython.zmq.blockingkernelmanager import BlockingKernelManager
-from IPython.zmq.kernelmanager import KernelManager
+from IPython.kernel.blockingkernelmanager import BlockingKernelManager
+from IPython.kernel.kernelmanager import KernelManager
+from IPython.kernel import tunnel_to_kernel, find_connection_file, swallow_argv
 from IPython.utils.path import filefind
 from IPython.utils.py3compat import str_to_bytes
 from IPython.utils.traitlets import (
     Dict, List, Unicode, CUnicode, Int, CBool, Any, CaselessStrEnum
 )
-from IPython.zmq.ipkernel import (
-    flags as ipkernel_flags,
-    aliases as ipkernel_aliases,
+from IPython.kernel.zmq.kernelapp import (
+    kernel_flags,
+    kernel_aliases,
     IPKernelApp
 )
-from IPython.zmq.session import Session, default_secure
-from IPython.zmq.zmqshell import ZMQInteractiveShell
+from IPython.kernel.zmq.session import Session, default_secure
+from IPython.kernel.zmq.zmqshell import ZMQInteractiveShell
 
 #-----------------------------------------------------------------------------
 # Network Constants
@@ -65,7 +65,7 @@ from IPython.utils.localinterfaces import LOCALHOST, LOCAL_IPS
 # Aliases and Flags
 #-----------------------------------------------------------------------------
 
-flags = dict(ipkernel_flags)
+flags = dict(kernel_flags)
 
 # the flags that are specific to the frontend
 # these must be scrubbed before being passed to the kernel,
@@ -85,7 +85,7 @@ app_flags.update(boolean_flag(
 ))
 flags.update(app_flags)
 
-aliases = dict(ipkernel_aliases)
+aliases = dict(kernel_aliases)
 
 # also scrub aliases from the frontend
 app_aliases = dict(
@@ -114,7 +114,7 @@ aliases.update(app_aliases)
 classes = [IPKernelApp, ZMQInteractiveShell, KernelManager, ProfileDir, Session]
 
 try:
-    from IPython.zmq.pylab.backend_inline import InlineBackend
+    from IPython.kernel.zmq.pylab.backend_inline import InlineBackend
 except ImportError:
     pass
 else:
@@ -194,7 +194,7 @@ class IPythonConsoleApp(Configurable):
             argv = sys.argv[1:]
         self.kernel_argv = swallow_argv(argv, self.frontend_aliases, self.frontend_flags)
         # kernel should inherit default config file from frontend
-        self.kernel_argv.append("--KernelApp.parent_appname='%s'"%self.name)
+        self.kernel_argv.append("--IPKernelApp.parent_appname='%s'" % self.name)
     
     def init_connection_file(self):
         """find the connection file, and load the info if found.
@@ -244,7 +244,7 @@ class IPythonConsoleApp(Configurable):
     
     def load_connection_file(self):
         """load ip/port/hmac config from JSON connection file"""
-        # this is identical to KernelApp.load_connection_file
+        # this is identical to IPKernelApp.load_connection_file
         # perhaps it can be centralized somewhere?
         try:
             fname = filefind(self.connection_file, ['.', self.profile_dir.security_dir])

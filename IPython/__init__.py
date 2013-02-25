@@ -68,7 +68,7 @@ def embed_kernel(module=None, local_ns=None, **kwargs):
         The namespace to load into IPython user namespace (default: caller)
     
     kwargs : various, optional
-        Further keyword args are relayed to the KernelApp constructor,
+        Further keyword args are relayed to the IPKernelApp constructor,
         allowing configuration of the Kernel.  Will only have an effect
         on the first embed_kernel call for a given process.
     
@@ -81,5 +81,5 @@ def embed_kernel(module=None, local_ns=None, **kwargs):
         local_ns = caller_locals
     
     # Only import .zmq when we really need it
-    from .zmq.ipkernel import embed_kernel as real_embed_kernel
+    from IPython.kernel.zmq.embed import embed_kernel as real_embed_kernel
     real_embed_kernel(module=module, local_ns=local_ns, **kwargs)

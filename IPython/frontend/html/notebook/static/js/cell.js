@@ -22,12 +22,20 @@ var IPython = (function (IPython) {
     /**
      * The Base `Cell` class from which to inherit
      * @class Cell
-     */
+     **/
 
     /*
      * @constructor
+     *
+     * @param {object|undefined} [options]
+     *     @param [options.cm_config] {object} config to pass to CodeMirror, will extend default parameters
      */
-    var Cell = function () {
+    var Cell = function (options) {
+
+        options = options || {};
+        // superclass default overwrite our default
+        this.cm_config = $.extend({},Cell.cm_default,options.cm_config);
+
         this.placeholder = this.placeholder || '';
         this.read_only = false;
         this.selected = false;
@@ -41,6 +49,11 @@ var IPython = (function (IPython) {
             this.bind_events();
         }
         this.cell_id = utils.uuid();
+    };
+
+    Cell.cm_default = {
+            indentUnit : 4,
+            readOnly: this.read_only,
     };
 
 
@@ -91,7 +104,7 @@ var IPython = (function (IPython) {
      * @method select
      */
     Cell.prototype.select = function () {
-        this.element.addClass('ui-widget-content ui-corner-all');
+        this.element.addClass('selected');
         this.selected = true;
     };
 
@@ -101,7 +114,7 @@ var IPython = (function (IPython) {
      * @method unselect
      */
     Cell.prototype.unselect = function () {
-        this.element.removeClass('ui-widget-content ui-corner-all');
+        this.element.removeClass('selected');
         this.selected = false;
     };
 
@@ -227,20 +240,27 @@ var IPython = (function (IPython) {
     };
 
     /**
-     * Toggle  CodeMirror LineNumber
-     * @method toggle_line_numbers
+     * Show/Hide CodeMirror LineNumber
+     * @method show_line_numbers
+     *
+     * @param value {Bool}  show (true), or hide (false) the line number in CodeMirror
      **/
-    Cell.prototype.toggle_line_numbers = function () {
-        if (this.code_mirror.getOption('lineNumbers') == false) {
-            this.code_mirror.setOption('lineNumbers', true);
-        } else {
-            this.code_mirror.setOption('lineNumbers', false);
-        }
+    Cell.prototype.show_line_numbers = function (value) {
+        this.code_mirror.setOption('lineNumbers', value);
         this.code_mirror.refresh();
     };
 
     /**
-     * force codemirror highlight mode
+     * Toggle  CodeMirror LineNumber
+     * @method toggle_line_numbers
+     **/
+    Cell.prototype.toggle_line_numbers = function () {
+        var val = this.code_mirror.getOption('lineNumbers');
+        this.show_line_numbers(!val);
+    };
+
+    /**
+     * Force codemirror highlight mode
      * @method force_highlight
      * @param {object} - CodeMirror mode
      **/

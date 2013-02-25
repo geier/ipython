@@ -61,12 +61,12 @@ from IPython.config.application import catch_config_error, boolean_flag
 from IPython.core.application import BaseIPythonApplication
 from IPython.core.profiledir import ProfileDir
 from IPython.frontend.consoleapp import IPythonConsoleApp
-from IPython.lib.kernel import swallow_argv
-from IPython.zmq.session import Session, default_secure
-from IPython.zmq.zmqshell import ZMQInteractiveShell
-from IPython.zmq.ipkernel import (
-    flags as ipkernel_flags,
-    aliases as ipkernel_aliases,
+from IPython.kernel import swallow_argv
+from IPython.kernel.zmq.session import Session, default_secure
+from IPython.kernel.zmq.zmqshell import ZMQInteractiveShell
+from IPython.kernel.zmq.kernelapp import (
+    kernel_flags,
+    kernel_aliases,
     IPKernelApp
 )
 from IPython.utils.importstring import import_item
@@ -96,6 +96,9 @@ ipython notebook --certfile=mycert.pem # use SSL/TLS certificate
 ipython notebook --port=5555 --ip=*    # Listen on port 5555, all interfaces
 """
 
+# Packagers: modify this line if you store the notebook static files elsewhere
+DEFAULT_STATIC_FILES_PATH = os.path.join(os.path.dirname(__file__), "static")
+
 #-----------------------------------------------------------------------------
 # Helper functions
 #-----------------------------------------------------------------------------
@@ -123,7 +126,7 @@ def random_ports(port, n):
 
 class NotebookWebApplication(web.Application):
 
-    def __init__(self, ipython_app, kernel_manager, notebook_manager, 
+    def __init__(self, ipython_app, kernel_manager, notebook_manager,
                  cluster_manager, log,
                  base_project_url, settings_overrides):
         handlers = [
@@ -186,6 +189,7 @@ class NotebookWebApplication(web.Application):
         self.ipython_app = ipython_app
         self.read_only = self.ipython_app.read_only
         self.config = self.ipython_app.config
+        self.use_less = self.ipython_app.use_less
         self.log = log
         self.jinja2_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "templates")))
 
@@ -195,7 +199,7 @@ class NotebookWebApplication(web.Application):
 # Aliases and Flags
 #-----------------------------------------------------------------------------
 
-flags = dict(ipkernel_flags)
+flags = dict(kernel_flags)
 flags['no-browser']=(
     {'NotebookApp' : {'open_browser' : False}},
     "Don't open the notebook in a browser after startup."
@@ -234,7 +238,7 @@ flags.update(boolean_flag('script', 'FileNotebookManager.save_script',
 # or it will raise an error on unrecognized flags
 notebook_flags = ['no-browser', 'no-mathjax', 'read-only', 'script', 'no-script']
 
-aliases = dict(ipkernel_aliases)
+aliases = dict(kernel_aliases)
 
 aliases.update({
     'ip': 'NotebookApp.ip',
@@ -343,7 +347,19 @@ class NotebookApp(BaseIPythonApplication):
     read_only = Bool(False, config=True,
         help="Whether to prevent editing/execution of notebooks."
     )
-    
+
+    use_less = Bool(False, config=True,
+                       help="""Wether to use Browser Side less-css parsing
+                       instead of compiled css version in templates that allows
+                       it. This is mainly convenient when working on the less
+                       file to avoid a build step, or if user want to overwrite
+                       some of the less variables without having to recompile
+                       everything.
+                       
+                       You will need to install the less.js component in the static directory
+                       either in the source tree or in your profile folder.
+                       """)
+
     webapp_settings = Dict(config=True,
             help="Supply overrides for the tornado.web.Application that the "
                  "IPython notebook uses.")
@@ -403,7 +419,7 @@ class NotebookApp(BaseIPythonApplication):
     @property
     def static_file_path(self):
         """return extra paths + the default location"""
-        return self.extra_static_paths + [os.path.join(os.path.dirname(__file__), "static")]
+        return self.extra_static_paths + [DEFAULT_STATIC_FILES_PATH]
 
     mathjax_url = Unicode("", config=True,
         help="""The url for MathJax.js."""
@@ -448,7 +464,7 @@ class NotebookApp(BaseIPythonApplication):
         # Scrub frontend-specific flags
         self.kernel_argv = swallow_argv(argv, notebook_aliases, notebook_flags)
         # Kernel should inherit default config file from frontend
-        self.kernel_argv.append("--KernelApp.parent_appname='%s'"%self.name)
+        self.kernel_argv.append("--IPKernelApp.parent_appname='%s'" % self.name)
 
         if self.extra_args:
             f = os.path.abspath(self.extra_args[0])

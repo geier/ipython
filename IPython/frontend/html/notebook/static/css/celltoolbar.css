@@ -2,13 +2,16 @@
 
 
 .celltoolbar {
-    border: thin solid #DDD;
-    margin-left: 0px;
+    border: thin solid #CFCFCF;
     border-bottom: none;
     background : #EEE;
     border-top-right-radius: 3px;
     border-top-left-radius: 3px;
+    width:100%;
+    -webkit-box-pack: end;
+    height:20px;
 }
+
 
 .no_input_radius {
     border-top-right-radius: 0px;
@@ -24,17 +27,31 @@
 }
 
 .ctb_hideshow {
-    display: none;
+    display:none;
+    vertical-align:bottom;
+    padding-right: 2px;
 }
+
+.celltoolbar > div {
+   padding-top: 0px;
+}
+
+.ctb_area {
+    margin:0;
+    padding:0;
+    width:100%;
+
+}
+
 
 /*ctb_show is added to either body or the ctb_hideshow div to show
 all or one cell's toolbars.
 */
 .ctb_show.ctb_hideshow, .ctb_show .ctb_hideshow {
-    display: block;
+    display:block;
 }
 
-.ctb_show .ctb_hideshow + div > div.input_area,  
+.ctb_show .input_area,
 .ctb_show .ctb_hideshow + div.text_cell_input {
     border-top-right-radius: 0px;
     border-top-left-radius: 0px;
@@ -46,30 +63,47 @@ all or one cell's toolbars.
 }
 
 .button_container {
-    float: right;
+    margin-top:0;
+    margin-bottom:0;
 }
 
-.button_container .ui-state-default, .button_container .ui-state-hover, .button_container .ui-state-hover span{
-    border-radius : 0 0 0 0;
-    border : none;
-}
 
+.ui-button {
+    min-width:30px;
+}
 .celltoolbar .button_container select {
     margin: 10px;
-    margin-top: 0px;
+    margin-top: 1px;
     margin-bottom: 0px;
-    font-size: 77%;
+    padding:0;
+    font-size: 87%;
+    width:auto;
+    display:inline-block;
+    height:18px;
+    line-height:18px;
+    vertical-align:top;
+}
+
+.celltoolbar label{
+    display:inline-block;
+    height:15px;
+    line-height:15px;
+    vertical-align:top;
 }
 
 .celltoolbar label span {
-    font-size: 77%;
+    font-size: 85%;
 }
 
 .celltoolbar input[type=checkbox] {
-    margin-bottom: 1px;
+    margin: 0px;
+    margin-left: 4px;
+    margin-right: 4px;
 }
 
-.celltoolbar ui-button {
+
+.celltoolbar .ui-button {
     border: none;
+    vertical-align:top;
+    height:20px;
 }
-

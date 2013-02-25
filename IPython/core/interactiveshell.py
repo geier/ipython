@@ -28,7 +28,6 @@ import runpy
 import sys
 import tempfile
 import types
-import urllib
 from io import open as io_open
 
 from IPython.config.configurable import SingletonConfigurable
@@ -2120,10 +2119,13 @@ class InteractiveShell(SingletonConfigurable):
         fn = self.find_cell_magic(magic_name)
         if fn is None:
             lm = self.find_line_magic(magic_name)
-            etpl = "Cell magic function `%%%%%s` not found%s."
-            extra = '' if lm is None else (' (But line magic `%%%s` exists, '
-                                    'did you mean that instead?)' % magic_name )
-            error(etpl % (magic_name, extra))
+            etpl = "Cell magic function `%%{0}` not found{1}."
+            extra = '' if lm is None else (' (But line magic `%{0}` exists, '
+                            'did you mean that instead?)'.format(magic_name))
+            error(etpl.format(magic_name, extra))
+        elif cell == '':
+            raise UsageError('%%{0} (with double %) expects code beneath it. '
+                            'Did you mean %{0} (single %)?'.format(magic_name))
         else:
             # Note: this is the distance in the stack to the user's frame.
             # This will need to be updated if the internal calling logic gets
@@ -2481,7 +2483,7 @@ class InteractiveShell(SingletonConfigurable):
                 # explicitly silenced, but only in short form.
                 if kw['raise_exceptions']:
                     raise
-                if status.code not in (0, None) and not kw['exit_ignore']:
+                if status.code and not kw['exit_ignore']:
                     self.showtraceback(exception_only=True)
             except:
                 if kw['raise_exceptions']:
@@ -2530,6 +2532,8 @@ class InteractiveShell(SingletonConfigurable):
         This version will never throw an exception, but instead print
         helpful error messages to the screen.
 
+        `SystemExit` exceptions with status code 0 or None are ignored.
+
         Parameters
         ----------
         mod_name : string
@@ -2538,10 +2542,14 @@ class InteractiveShell(SingletonConfigurable):
             The globals namespace.
         """
         try:
-            where.update(
-                runpy.run_module(str(mod_name), run_name="__main__",
-                                 alter_sys=True)
-                )
+            try:
+                where.update(
+                    runpy.run_module(str(mod_name), run_name="__main__",
+                                     alter_sys=True)
+                    )
+            except SystemExit as status:
+                if status.code:
+                    raise
         except:
             self.showtraceback()
             warn('Unknown failure executing module: <%s>' % mod_name)
@@ -2693,7 +2701,9 @@ class InteractiveShell(SingletonConfigurable):
                 warn("AST transformer %r threw an error. It will be unregistered." % transformer)
                 self.ast_transformers.remove(transformer)
         
-        return ast.fix_missing_locations(node)
+        if self.ast_transformers:
+            ast.fix_missing_locations(node)
+        return node
                 
 
     def run_ast_nodes(self, nodelist, cell_name, interactivity='last_expr',
@@ -2854,6 +2864,10 @@ class InteractiveShell(SingletonConfigurable):
         except KeyError:
             error("Backend %r not supported" % gui)
             return
+        except ImportError:
+            error("pylab mode doesn't work as matplotlib could not be found." + \
+                  "\nIs it installed on the system?")
+            return
         self.user_ns.update(ns)
         self.user_ns_hidden.update(ns)
         # Now we must activate the gui pylab wants to use, and fix %run to take
@@ -2989,7 +3003,8 @@ class InteractiveShell(SingletonConfigurable):
                 return openpy.read_py_url(utarget, skip_encoding_cookie=skip_encoding_cookie)
         except UnicodeDecodeError:
             if not py_only :
-                response = urllib.urlopen(target)
+                from urllib import urlopen  # Deferred import
+                response = urlopen(target)
                 return response.read().decode('latin1')
             raise ValueError(("'%s' seem to be unreadable.") % utarget)
 
