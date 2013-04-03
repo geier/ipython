@@ -50,11 +50,11 @@ var IPython = (function (IPython) {
         
         this.collapse_button.button();
         this.collapse_button.addClass('output_collapsed vbox');
-        this.collapse_button.attr('title', 'click to expand outout');
+        this.collapse_button.attr('title', 'click to expand output');
         this.collapse_button.html('. . .');
         
         this.prompt_overlay.addClass('out_prompt_overlay prompt');
-        this.prompt_overlay.attr('title', 'click to expand outout; double click to hide output');
+        this.prompt_overlay.attr('title', 'click to expand output; double click to hide output');
         
         this.collapse();
     };
@@ -378,7 +378,6 @@ var IPython = (function (IPython) {
     OutputArea.prototype.append_text = function (data, element, extra_class) {
         var toinsert = $("<div/>").addClass("box-flex1 output_subarea output_text");
         // escape ANSI & HTML specials in plaintext:
-        data = utils.wrapUrls(data);
         data = utils.fixConsole(data);
         data = utils.fixCarriageReturn(data);
         data = utils.autoLinkUrls(data);
