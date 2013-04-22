@@ -31,7 +31,12 @@ import time
 import uuid
 import webbrowser
 
+
 # Third party
+# check for pyzmq 2.1.11
+from IPython.utils.zmqrelated import check_for_zmq
+check_for_zmq('2.1.11', 'IPython.frontend.html.notebook')
+
 import zmq
 from jinja2 import Environment, FileSystemLoader
 
@@ -40,10 +45,24 @@ from jinja2 import Environment, FileSystemLoader
 from zmq.eventloop import ioloop
 ioloop.install()
 
+# check for tornado 2.1.0
+msg = "The IPython Notebook requires tornado >= 2.1.0"
+try:
+    import tornado
+except ImportError:
+    raise ImportError(msg)
+try:
+    version_info = tornado.version_info
+except AttributeError:
+    raise ImportError(msg + ", but you have < 1.1.0")
+if version_info < (2,1,0):
+    raise ImportError(msg + ", but you have %s" % tornado.version)
+
 from tornado import httpserver
 from tornado import web
 
 # Our own libraries
+from IPython.frontend.html.notebook import DEFAULT_STATIC_FILES_PATH
 from .kernelmanager import MappingKernelManager
 from .handlers import (LoginHandler, LogoutHandler,
     ProjectDashboardHandler, NewHandler, NamedNotebookHandler,
@@ -51,7 +70,7 @@ from .handlers import (LoginHandler, LogoutHandler,
     ShellHandler, NotebookRootHandler, NotebookHandler, NotebookCopyHandler,
     RSTHandler, AuthenticatedFileHandler, PrintNotebookHandler,
     MainClusterHandler, ClusterProfileHandler, ClusterActionHandler,
-    FileFindHandler,
+    FileFindHandler, NotebookRedirectHandler,
 )
 from .nbmanager import NotebookManager
 from .filenbmanager import FileNotebookManager
@@ -85,6 +104,7 @@ from IPython.utils.path import filefind
 _kernel_id_regex = r"(?P<kernel_id>\w+-\w+-\w+-\w+-\w+)"
 _kernel_action_regex = r"(?P<action>restart|interrupt)"
 _notebook_id_regex = r"(?P<notebook_id>\w+-\w+-\w+-\w+-\w+)"
+_notebook_name_regex = r"(?P<notebook_name>.+\.ipynb)"
 _profile_regex = r"(?P<profile>[^\/]+)" # there is almost no text that is invalid
 _cluster_action_regex = r"(?P<action>start|stop)"
 
@@ -95,9 +115,6 @@ ipython notebook --pylab=inline        # pylab in inline plotting mode
 ipython notebook --certfile=mycert.pem # use SSL/TLS certificate
 ipython notebook --port=5555 --ip=*    # Listen on port 5555, all interfaces
 """
-
-# Packagers: modify this line if you store the notebook static files elsewhere
-DEFAULT_STATIC_FILES_PATH = os.path.join(os.path.dirname(__file__), "static")
 
 #-----------------------------------------------------------------------------
 # Helper functions
@@ -135,6 +152,7 @@ class NotebookWebApplication(web.Application):
             (r"/logout", LogoutHandler),
             (r"/new", NewHandler),
             (r"/%s" % _notebook_id_regex, NamedNotebookHandler),
+            (r"/%s" % _notebook_name_regex, NotebookRedirectHandler),
             (r"/%s/copy" % _notebook_id_regex, NotebookCopyHandler),
             (r"/%s/print" % _notebook_id_regex, PrintNotebookHandler),
             (r"/kernels", MainKernelHandler),
@@ -169,6 +187,7 @@ class NotebookWebApplication(web.Application):
             cookie_secret=os.urandom(1024),
             login_url=url_path_join(base_project_url,'/login'),
             cookie_name='username-%s' % uuid.uuid4(),
+            base_project_url = base_project_url,
         )
 
         # allow custom overrides for the tornado web app.
@@ -456,6 +475,11 @@ class NotebookApp(BaseIPythonApplication):
         config=True,
         help='The notebook manager class to use.')
 
+    trust_xheaders = Bool(False, config=True,
+        help=("Whether to trust or not X-Scheme/X-Forwarded-Proto and X-Real-Ip/X-Forwarded-For headers"
+              "sent by the upstream reverse proxy. Neccesary if the proxy handles SSL")
+    )
+
     def parse_command_line(self, argv=None):
         super(NotebookApp, self).parse_command_line(argv)
         if argv is None:
@@ -484,7 +508,6 @@ class NotebookApp(BaseIPythonApplication):
         )
         kls = import_item(self.notebook_manager_class)
         self.notebook_manager = kls(config=self.config, log=self.log)
-        self.notebook_manager.log_info()
         self.notebook_manager.load_notebook_names()
         self.cluster_manager = ClusterManager(config=self.config, log=self.log)
         self.cluster_manager.update_profiles()
@@ -509,7 +532,8 @@ class NotebookApp(BaseIPythonApplication):
         else:
             ssl_options = None
         self.web_app.password = self.password
-        self.http_server = httpserver.HTTPServer(self.web_app, ssl_options=ssl_options)
+        self.http_server = httpserver.HTTPServer(self.web_app, ssl_options=ssl_options,
+                                                 xheaders=self.trust_xheaders)
         if not self.ip:
             warning = "WARNING: The notebook server is listening on all IP addresses"
             if ssl_options is None:
@@ -523,6 +547,30 @@ class NotebookApp(BaseIPythonApplication):
             try:
                 self.http_server.listen(port, self.ip)
             except socket.error as e:
+                # XXX: remove the e.errno == -9 block when we require
+                # tornado >= 3.0
+                if e.errno == -9 and tornado.version_info[0] < 3:
+                    # The flags passed to socket.getaddrinfo from
+                    # tornado.netutils.bind_sockets can cause "gaierror:
+                    # [Errno -9] Address family for hostname not supported"
+                    # when the interface is not associated, for example.
+                    # Changing the flags to exclude socket.AI_ADDRCONFIG does
+                    # not cause this error, but the only way to do this is to
+                    # monkeypatch socket to remove the AI_ADDRCONFIG attribute
+                    saved_AI_ADDRCONFIG = socket.AI_ADDRCONFIG
+                    self.log.warn('Monkeypatching socket to fix tornado bug')
+                    del(socket.AI_ADDRCONFIG)
+                    try:
+                        # retry the tornado call without AI_ADDRCONFIG flags
+                        self.http_server.listen(port, self.ip)
+                    except socket.error as e2:
+                        e = e2
+                    else:
+                        self.port = port
+                        success = True
+                        break
+                    # restore the monekypatch
+                    socket.AI_ADDRCONFIG = saved_AI_ADDRCONFIG
                 if e.errno != errno.EADDRINUSE:
                     raise
                 self.log.info('The port %i is already in use, trying another random port.' % port)
@@ -536,21 +584,15 @@ class NotebookApp(BaseIPythonApplication):
             self.exit(1)
     
     def init_signal(self):
-        # FIXME: remove this check when pyzmq dependency is >= 2.1.11
-        # safely extract zmq version info:
-        try:
-            zmq_v = zmq.pyzmq_version_info()
-        except AttributeError:
-            zmq_v = [ int(n) for n in re.findall(r'\d+', zmq.__version__) ]
-            if 'dev' in zmq.__version__:
-                zmq_v.append(999)
-            zmq_v = tuple(zmq_v)
-        if zmq_v >= (2,1,9) and not sys.platform.startswith('win'):
-            # This won't work with 2.1.7 and
-            # 2.1.9-10 will log ugly 'Interrupted system call' messages,
-            # but it will work
+        if not sys.platform.startswith('win'):
             signal.signal(signal.SIGINT, self._handle_sigint)
         signal.signal(signal.SIGTERM, self._signal_stop)
+        if hasattr(signal, 'SIGUSR1'):
+            # Windows doesn't support SIGUSR1
+            signal.signal(signal.SIGUSR1, self._signal_info)
+        if hasattr(signal, 'SIGINFO'):
+            # only on BSD-based systems
+            signal.signal(signal.SIGINFO, self._signal_info)
     
     def _handle_sigint(self, sig, frame):
         """SIGINT handler spawns confirmation dialog"""
@@ -576,7 +618,10 @@ class NotebookApp(BaseIPythonApplication):
         """
         # FIXME: remove this delay when pyzmq dependency is >= 2.1.11
         time.sleep(0.1)
-        sys.stdout.write("Shutdown Notebook Server (y/[n])? ")
+        info = self.log.info
+        info('interrupted')
+        print self.notebook_info()
+        sys.stdout.write("Shutdown this notebook server (y/[n])? ")
         sys.stdout.flush()
         r,w,x = select.select([sys.stdin], [], [], 5)
         if r:
@@ -597,6 +642,9 @@ class NotebookApp(BaseIPythonApplication):
     def _signal_stop(self, sig, frame):
         self.log.critical("received signal %s, stopping", sig)
         ioloop.IOLoop.instance().stop()
+
+    def _signal_info(self, sig, frame):
+        print self.notebook_info()
     
     @catch_config_error
     def initialize(self, argv=None):
@@ -615,12 +663,23 @@ class NotebookApp(BaseIPythonApplication):
         self.log.info('Shutting down kernels')
         self.kernel_manager.shutdown_all()
 
+    def notebook_info(self):
+        "Return the current working directory and the server url information"
+        mgr_info = self.notebook_manager.info_string() + "\n"
+        return mgr_info +"The IPython Notebook is running at: %s" % self._url
+
     def start(self):
+        """ Start the IPython Notebok server app, after initialization
+        
+        This method takes no arguments so all configuration and initialization
+        must be done prior to calling this method."""
         ip = self.ip if self.ip else '[all ip addresses on your system]'
         proto = 'https' if self.certfile else 'http'
         info = self.log.info
-        info("The IPython Notebook is running at: %s://%s:%i%s" %
-             (proto, ip, self.port,self.base_project_url) )
+        self._url = "%s://%s:%i%s" % (proto, ip, self.port,
+                                      self.base_project_url)
+        for line in self.notebook_info().split("\n"):
+            info(line)
         info("Use Control-C to stop this server and shut down all kernels.")
 
         if self.open_browser or self.file_to_run:

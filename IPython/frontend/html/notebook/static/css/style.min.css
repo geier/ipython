@@ -849,7 +849,7 @@ a.label:hover,a.badge:hover{color:#ffffff;text-decoration:none;cursor:pointer;}
 .corner-all{border-radius:4px;}
 .hbox{display:-webkit-box;-webkit-box-orient:horizontal;-webkit-box-align:stretch;display:-moz-box;-moz-box-orient:horizontal;-moz-box-align:stretch;display:box;box-orient:horizontal;box-align:stretch;}
 .hbox>*{-webkit-box-flex:0;-moz-box-flex:0;box-flex:0;}
-.vbox{display:-webkit-box;-webkit-box-orient:vertical;-webkit-box-align:stretch;display:-moz-box;-moz-box-orient:vertical;-moz-box-align:stretch;display:box;box-orient:vertical;box-align:stretch;}
+.vbox{display:-webkit-box;-webkit-box-orient:vertical;-webkit-box-align:stretch;display:-moz-box;-moz-box-orient:vertical;-moz-box-align:stretch;display:box;box-orient:vertical;box-align:stretch;width:100%;}
 .vbox>*{-webkit-box-flex:0;-moz-box-flex:0;box-flex:0;}
 .reverse{-webkit-box-direction:reverse;-moz-box-direction:reverse;box-direction:reverse;}
 .box-flex0{-webkit-box-flex:0;-moz-box-flex:0;box-flex:0;}
@@ -900,7 +900,7 @@ div.out_prompt_overlay{height:100%;padding:0px;position:absolute;border-radius:4
 div.out_prompt_overlay:hover{box-shadow:inset 0 0 1px #000;background:rgba(240, 240, 240, 0.5);}
 div.output_prompt{color:darkred;margin:0 5px 0 -5px;}
 div.output_area{padding:0px;page-break-inside:avoid;}
-div.output_area pre{font-family:monospace;margin:0;padding:0;border:0;font-size:100%;font:inherit;vertical-align:baseline;color:black;}
+div.output_area pre{font-family:monospace;margin:0;padding:0;border:0;font-size:100%;vertical-align:baseline;color:black;}
 div.output_subarea{padding:0.44em 0.4em 0.4em 1px;}
 div.output_text{text-align:left;color:#000000;font-family:monospace;line-height:1.231;}
 div.output_stream{padding-top:0.0em;padding-bottom:0.0em;}
@@ -934,6 +934,7 @@ pre,code,kbd,samp{white-space:pre-wrap;}
 .js-error{color:darkred;}
 a{text-decoration:underline;}
 p{margin-bottom:0;}
+a.heading-anchor:link,a.heading-anchor:visited{text-decoration:none;color:inherit;}
 @media print{body{overflow:visible !important;} div#notebook{overflow:visible !important;} .ui-widget-content{border:0px;} #save_widget{margin:0px !important;} #header,#pager,#pager_splitter,#menubar,#toolbar{display:none !important;} .cell{border:none !important;} .toolbar{display:none;}}.rendered_html{color:black;}.rendered_html em{font-style:italic;}
 .rendered_html strong{font-weight:bold;}
 .rendered_html u{text-decoration:underline;}

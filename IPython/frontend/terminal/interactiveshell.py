@@ -82,7 +82,7 @@ def get_pasted_lines(sentinel, l_input=py3compat.input):
 class TerminalMagics(Magics):
     def __init__(self, shell):
         super(TerminalMagics, self).__init__(shell)
-        self.input_splitter = IPythonInputSplitter(input_mode='line')
+        self.input_splitter = IPythonInputSplitter()
 
     def cleanup_input(self, block):
         """Apply all possible IPython cleanups to an input block.
@@ -381,6 +381,15 @@ class TerminalInteractiveShell(InteractiveShell):
         self.init_term_title()
         self.init_usage(usage)
         self.init_banner(banner1, banner2, display_banner)
+
+    #-------------------------------------------------------------------------
+    # Overrides of init stages
+    #-------------------------------------------------------------------------
+
+    def init_display_formatter(self):
+        super(TerminalInteractiveShell, self).init_display_formatter()
+        # terminal only supports plaintext
+        self.display_formatter.active_types = ['text/plain']
 
     #-------------------------------------------------------------------------
     # Things related to the terminal

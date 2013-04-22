@@ -7,7 +7,7 @@ Authors:
 """
 
 #-----------------------------------------------------------------------------
-#       Copyright (C) 2008-2011 The IPython Development Team
+#       Copyright (C) 2013 The IPython Development Team
 #
 #  Distributed under the terms of the BSD License.  The full license is in
 #  the file COPYING, distributed as part of this software.
@@ -19,6 +19,8 @@ Authors:
 
 from __future__ import print_function
 
+import os
+
 from .displaypub import (
     publish_pretty, publish_html,
     publish_latex, publish_svg,
@@ -27,6 +29,17 @@ from .displaypub import (
 )
 
 from IPython.utils.py3compat import string_types
+
+#-----------------------------------------------------------------------------
+# utility functions
+#-----------------------------------------------------------------------------
+
+def _safe_exists(path):
+    """Check path, but don't let exceptions raise"""
+    try:
+        return os.path.exists(path)
+    except Exception:
+        return False
 
 #-----------------------------------------------------------------------------
 # Main functions
@@ -47,7 +60,7 @@ def display(*objs, **kwargs):
         format data dict. If this is set *only* the format types included
         in this list will be computed.
     exclude : list or tuple, optional
-        A list of format type string (MIME types) to exclue in the format
+        A list of format type strings (MIME types) to exclude in the format
         data dict. If this is set all format types will be computed,
         except for those included in this argument.
     """
@@ -186,7 +199,7 @@ def display_latex(*objs, **kwargs):
 
 def display_json(*objs, **kwargs):
     """Display the JSON representation of an object.
-    
+
     Note that not many frontends support displaying JSON.
 
     Parameters
@@ -248,20 +261,26 @@ class DisplayObject(object):
         Parameters
         ----------
         data : unicode, str or bytes
-            The raw data or a URL to download the data from.
+            The raw data or a URL or file to load the data from
         url : unicode
             A URL to download the data from.
         filename : unicode
             Path to a local file to load the data from.
         """
-        if data is not None and isinstance(data, string_types) and data.startswith('http'):
-            self.url = data
-            self.filename = None
-            self.data = None
-        else:
-            self.data = data
-            self.url = url
-            self.filename = None if filename is None else unicode(filename)
+        if data is not None and isinstance(data, string_types):
+            if data.startswith('http') and url is None:
+                url = data
+                filename = None
+                data = None
+            elif _safe_exists(data) and filename is None:
+                url = None
+                filename = data
+                data = None
+
+        self.data = data
+        self.url = url
+        self.filename = None if filename is None else unicode(filename)
+
         self.reload()
 
     def reload(self):
@@ -313,15 +332,15 @@ class Latex(DisplayObject):
 
 
 class SVG(DisplayObject):
-    
+
     # wrap data in a property, which extracts the <svg> tag, discarding
     # document headers
     _data = None
-    
+
     @property
     def data(self):
         return self._data
-    
+
     @data.setter
     def data(self, svg):
         if svg is None:
@@ -339,7 +358,7 @@ class SVG(DisplayObject):
             # but this is probably an error.
             pass
         self._data = svg
-    
+
     def _repr_svg_(self):
         return self.data
 
@@ -369,8 +388,8 @@ class Javascript(DisplayObject):
         When this object is returned by an expression or passed to the
         display function, it will result in the data being displayed
         in the frontend. If the data is a URL, the data will first be
-        downloaded and then displayed. 
-        
+        downloaded and then displayed.
+
         In the Notebook, the containing element will be available as `element`,
         and jQuery will be available.  The output area starts hidden, so if
         the js appends content to `element` that should be visible, then
@@ -391,7 +410,7 @@ class Javascript(DisplayObject):
             string.
         css: : list or str
             A sequence of css files to load before running the source code.
-            The full URLs of the css files should be give. A single css URL
+            The full URLs of the css files should be given. A single css URL
             can also be given as a string.
         """
         if isinstance(lib, basestring):
@@ -420,6 +439,9 @@ class Javascript(DisplayObject):
         r += lib_t2*len(self.lib)
         return r
 
+# constants for identifying png/jpeg data
+_PNG = b'\x89PNG\r\n\x1a\n'
+_JPEG = b'\xff\xd8'
 
 class Image(DisplayObject):
 
@@ -476,7 +498,9 @@ class Image(DisplayObject):
             ext = self._find_ext(url)
         elif data is None:
             raise ValueError("No image data found. Expecting filename, url, or data.")
-        elif isinstance(data, string_types) and data.startswith('http'):
+        elif isinstance(data, string_types) and (
+            data.startswith('http') or _safe_exists(data)
+        ):
             ext = self._find_ext(data)
         else:
             ext = None
@@ -487,6 +511,11 @@ class Image(DisplayObject):
                 format = self._FMT_JPEG
             if ext == u'png':
                 format = self._FMT_PNG
+        elif isinstance(data, bytes) and format == 'png':
+            # infer image type from image data header,
+            # only if format might not have been specified.
+            if data[:2] == _JPEG:
+                format = 'jpeg'
 
         self.format = unicode(format).lower()
         self.embed = embed if embed is not None else (url is None)
@@ -525,12 +554,12 @@ class Image(DisplayObject):
 
 def clear_output(stdout=True, stderr=True, other=True):
     """Clear the output of the current cell receiving output.
-    
+
     Optionally, each of stdout/stderr or other non-stream data (e.g. anything
     produced by display()) can be excluded from the clear event.
-    
+
     By default, everything is cleared.
-    
+
     Parameters
     ----------
     stdout : bool [default: True]
@@ -554,4 +583,4 @@ def clear_output(stdout=True, stderr=True, other=True):
         if stderr:
             print('\033[2K\r', file=io.stderr, end='')
             io.stderr.flush()
-        
+

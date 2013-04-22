@@ -12,7 +12,8 @@ from IPython.external import qt
 from IPython.external.qt import QtCore, QtGui
 
 # Local imports
-from IPython.core.inputsplitter import InputSplitter, transform_classic_prompt
+from IPython.core.inputsplitter import InputSplitter, IPythonInputSplitter
+from IPython.core.inputtransformer import classic_prompt
 from IPython.core.oinspect import call_tip
 from IPython.frontend.qt.base_frontend_mixin import BaseFrontendMixin
 from IPython.utils.traitlets import Bool, Instance, Unicode
@@ -113,7 +114,10 @@ class FrontendWidget(HistoryConsoleWidget, BaseFrontendMixin):
     exit_requested = QtCore.Signal(object)
 
     # Protected class variables.
-    _transform_prompt = staticmethod(transform_classic_prompt)
+    _prompt_transformer = IPythonInputSplitter(physical_line_transforms=[classic_prompt()],
+                                               logical_line_transforms=[],
+                                               python_line_transforms=[],
+                                              )
     _CallTipRequest = namedtuple('_CallTipRequest', ['id', 'pos'])
     _CompletionRequest = namedtuple('_CompletionRequest', ['id', 'pos'])
     _ExecutionRequest = namedtuple('_ExecutionRequest', ['id', 'kind'])
@@ -142,7 +146,7 @@ class FrontendWidget(HistoryConsoleWidget, BaseFrontendMixin):
         self._copy_raw_action = QtGui.QAction('Copy (Raw Text)', None)
         self._hidden = False
         self._highlighter = FrontendHighlighter(self)
-        self._input_splitter = self._input_splitter_class(input_mode='cell')
+        self._input_splitter = self._input_splitter_class()
         self._kernel_manager = None
         self._request_info = {}
         self._request_info['execute'] = {};
@@ -186,8 +190,7 @@ class FrontendWidget(HistoryConsoleWidget, BaseFrontendMixin):
         elif self._control.hasFocus():
             text = self._control.textCursor().selection().toPlainText()
             if text:
-                lines = map(self._transform_prompt, text.splitlines())
-                text = '\n'.join(lines)
+                text = self._prompt_transformer.transform_cell(text)
                 QtGui.QApplication.clipboard().setText(text)
         else:
             self.log.debug("frontend widget : unknown copy target")
@@ -201,6 +204,7 @@ class FrontendWidget(HistoryConsoleWidget, BaseFrontendMixin):
             prompt created. When triggered by an Enter/Return key press,
             'interactive' is True; otherwise, it is False.
         """
+        self._input_splitter.reset()
         complete = self._input_splitter.push(source)
         if interactive:
             complete = not self._input_splitter.push_accepts_more()

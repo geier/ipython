@@ -427,7 +427,7 @@ Defaulting color scheme to 'NoColor'"""
         save_dstore('rc_separate_out2',shell.separate_out2)
         save_dstore('rc_prompts_pad_left',pm.justify)
         save_dstore('rc_separate_in',shell.separate_in)
-        save_dstore('rc_plain_text_only',disp_formatter.plain_text_only)
+        save_dstore('rc_active_types',disp_formatter.active_types)
         save_dstore('prompt_templates',(pm.in_template, pm.in2_template, pm.out_template))
 
         if mode == False:
@@ -444,7 +444,7 @@ Defaulting color scheme to 'NoColor'"""
             pm.justify = False
 
             ptformatter.pprint = False
-            disp_formatter.plain_text_only = True
+            disp_formatter.active_types = ['text/plain']
 
             shell.magic('xmode Plain')
         else:
@@ -459,7 +459,7 @@ Defaulting color scheme to 'NoColor'"""
             pm.justify = dstore.rc_prompts_pad_left
 
             ptformatter.pprint = dstore.rc_pprint
-            disp_formatter.plain_text_only = dstore.rc_plain_text_only
+            disp_formatter.active_types = dstore.rc_active_types
 
             shell.magic('xmode ' + dstore.xmode)
 
@@ -554,14 +554,13 @@ Defaulting color scheme to 'NoColor'"""
         help='Export IPython history as a notebook. The filename argument '
              'is used to specify the notebook name and format. For example '
              'a filename of notebook.ipynb will result in a notebook name '
-             'of "notebook" and a format of "xml". Likewise using a ".json" '
-             'or ".py" file extension will write the notebook in the json '
-             'or py formats.'
+             'of "notebook" and a format of "json". Likewise using a ".py" '
+             'file extension will write the notebook as a Python script'
     )
     @magic_arguments.argument(
         '-f', '--format',
         help='Convert an existing IPython notebook to a new format. This option '
-             'specifies the new format and can have the values: xml, json, py. '
+             'specifies the new format and can have the values: json, py. '
              'The target filename is chosen automatically based on the new '
              'format. The filename argument gives the name of the source file.'
     )

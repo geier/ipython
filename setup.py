@@ -93,13 +93,10 @@ def cleanup():
 # Handle OS specific things
 #-------------------------------------------------------------------------------
 
-if os.name == 'posix':
-    os_name = 'posix'
-elif os.name in ['nt','dos']:
+if os.name in ('nt','dos'):
     os_name = 'windows'
 else:
-    print('Unsupported operating system:',os.name)
-    sys.exit(1)
+    os_name = os.name
 
 # Under Windows, 'sdist' has not been supported.  Now that the docs build with
 # Sphinx it might work, but let's not turn it on until someone confirms that it
@@ -177,7 +174,7 @@ from distutils.command.sdist import sdist
 from distutils.command.upload import upload
 
 class UploadWindowsInstallers(upload):
-    
+
     description = "Upload Windows installers to PyPI (only used from tools/release_windows.py)"
     user_options = upload.user_options + [
         ('files=', 'f', 'exe file (or glob) to upload')
@@ -190,7 +187,7 @@ class UploadWindowsInstallers(upload):
             version=meta.get_version()
         )
         self.files = os.path.join('dist', '%s.*.exe' % base)
-    
+
     def run(self):
         for dist_file in glob(self.files):
             self.upload_file('bdist_wininst', 'any', dist_file)
@@ -259,11 +256,13 @@ if 'setuptools' in sys.modules:
                ('sdist' in sys.argv or 'bdist_rpm' in sys.argv):
             print >> sys.stderr, "ERROR: bdist_wininst must be run alone. Exiting."
             sys.exit(1)
+        setup_args['data_files'].append(
+            ['Scripts', ('scripts/ipython.ico', 'scripts/ipython_nb.ico')])
         setup_args['scripts'] = [pjoin('scripts','ipython_win_post_install.py')]
         setup_args['options'] = {"bdist_wininst":
                                  {"install_script":
                                   "ipython_win_post_install.py"}}
-    
+
     if PY3:
         setuptools_extra_args['use_2to3'] = True
         # we try to make a 2.6, 2.7, and 3.1 to 3.3 python compatible code

@@ -516,7 +516,17 @@ var IPython = (function (IPython) {
     HeadingCell.prototype.set_rendered = function (text) {
         var r = this.element.find("div.text_cell_render");
         r.empty();
-        r.append($('<h'+this.level+'/>').html(text));
+        var link = text.replace(/ /g, '_');
+        r.append(
+            $('<h'+this.level+'/>')
+            .append(
+            $('<a/>')
+                .addClass('heading-anchor')
+                .attr('href', '#' + link)
+                .attr('id', link)
+                .html(text)
+            )
+        );
     };
 
 
